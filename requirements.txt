@@ -1,0 +1,6 @@
+# Python dependency (install with pip, or use the system package python3-numpy)
+numpy
+
+# Also required, but installed as system packages, not via pip:
+#   mpv         (sudo apt install mpv)
+#   alsa-utils  (sudo apt install alsa-utils)  -> provides arecord
