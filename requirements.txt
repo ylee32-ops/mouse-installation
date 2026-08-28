@@ -1,6 +1,7 @@
-# Python dependency (install with pip, or use the system package python3-numpy)
+# Python packages (install with: pip install -r requirements.txt --break-system-packages)
 numpy
+sounddevice
 
-# Also required, but installed as system packages, not via pip:
+# Also required, installed as system packages (not pip):
 #   mpv         (sudo apt install mpv)
-#   alsa-utils  (sudo apt install alsa-utils)  -> provides arecord
+#   libportaudio2 (sudo apt install libportaudio2)   -> needed by sounddevice
