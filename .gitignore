@@ -1,5 +1,7 @@
-# Video files are large; keep them out of the repo and copy them onto the Pi
-# separately (see README).
+# Your stop-motion photos and the clips built from them are large; keep them out
+# of git and copy them onto the Pi separately (see README).
+frames/
+build/
 *.mp4
 
 # Python

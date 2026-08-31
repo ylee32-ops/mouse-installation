@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mouse Installation — Prototype</title>
+<style>
+:root{
+  --bg:#0e0e10; --panel:#17171a; --line:#2a2a30; --text:#e8e8ea;
+  --muted:#8a8a94; --accent:#ffb454; --hot:#ff5d5d; --ok:#5dd6a0;
+  --font:ui-sans-serif,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:13px/1.5 var(--font);
+  display:grid;grid-template-columns:1fr 380px;height:100vh;overflow:hidden}
+
+/* ---------- stage ---------- */
+#stage{display:flex;flex-direction:column;min-width:0}
+#screen{flex:1;background:#000;position:relative;display:flex;
+  align-items:center;justify-content:center;overflow:hidden}
+#canvas{max-width:100%;max-height:100%;display:block;image-rendering:auto}
+#empty-hint{position:absolute;color:var(--muted);text-align:center;padding:40px;max-width:560px}
+#empty-hint h2{font-size:17px;color:var(--text);margin-bottom:14px}
+#empty-hint code{font-family:var(--mono);color:var(--accent);font-size:12px}
+#empty-hint pre{font-family:var(--mono);font-size:11.5px;text-align:left;
+  background:#131316;border:1px solid var(--line);border-radius:8px;
+  padding:12px 14px;margin:14px 0;color:var(--muted);line-height:1.7}
+
+#hud{position:absolute;top:0;left:0;right:0;display:flex;gap:10px;
+  padding:12px;pointer-events:none;align-items:flex-start}
+.badge{background:rgba(0,0,0,.72);border:1px solid var(--line);border-radius:6px;
+  padding:6px 11px;font-family:var(--mono);font-size:11.5px;backdrop-filter:blur(6px)}
+.badge b{color:var(--accent);font-weight:600}
+#meterwrap{margin-left:auto;width:190px}
+#meter{height:9px;background:#000;border:1px solid var(--line);border-radius:5px;
+  position:relative;overflow:hidden;margin-top:5px}
+#level{position:absolute;inset:0 auto 0 0;width:0;background:var(--ok);transition:width .05s}
+#thr{position:absolute;top:0;bottom:0;width:2px;background:var(--hot);left:30%}
+
+/* ---------- transport ---------- */
+#transport{display:flex;gap:8px;align-items:center;padding:10px 12px;
+  border-top:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+#log{height:132px;overflow-y:auto;background:#0a0a0c;border-top:1px solid var(--line);
+  padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+#log div{padding:1px 0}
+#log b{color:var(--accent);font-weight:500}
+#log .flee{color:var(--hot)}
+
+/* ---------- panel ---------- */
+#panel{background:var(--panel);border-left:1px solid var(--line);
+  overflow-y:auto;padding:14px}
+h3{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+  margin:20px 0 9px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3:first-child{margin-top:0}
+button{background:#232329;color:var(--text);border:1px solid var(--line);
+  border-radius:6px;padding:7px 13px;font:inherit;font-size:12px;cursor:pointer}
+button:hover{background:#2c2c34;border-color:#3a3a44}
+button.primary{background:var(--accent);color:#1a1205;border-color:var(--accent);font-weight:600}
+button.primary:hover{background:#ffc478}
+button.on{background:var(--ok);color:#062018;border-color:var(--ok);font-weight:600}
+label{display:flex;align-items:center;gap:9px;margin:7px 0;font-size:12px}
+label span:first-child{flex:1;color:var(--muted)}
+input[type=range]{flex:1.5;accent-color:var(--accent);min-width:0}
+input[type=number]{width:64px;background:#0e0e10;border:1px solid var(--line);
+  color:var(--text);border-radius:4px;padding:4px 6px;font:12px var(--mono)}
+select{background:#0e0e10;border:1px solid var(--line);color:var(--text);
+  border-radius:4px;padding:4px 6px;font:12px var(--font)}
+.val{font-family:var(--mono);font-size:11.5px;color:var(--accent);width:52px;text-align:right}
+.char{border:1px solid var(--line);border-radius:8px;margin-bottom:9px;overflow:hidden}
+.char>summary{padding:9px 11px;cursor:pointer;background:#1d1d22;font-weight:600;
+  font-size:12.5px;list-style:none;display:flex;align-items:center;gap:8px}
+.char>summary::-webkit-details-marker{display:none}
+.char>summary::before{content:"▸";color:var(--muted);font-size:10px}
+.char[open]>summary::before{content:"▾"}
+.char>div{padding:10px 11px}
+.seq{border-top:1px solid var(--line);padding-top:9px;margin-top:9px}
+.seq-head{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.seq-head b{font-family:var(--mono);font-size:11.5px;font-weight:500;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.hint{font-size:11px;color:var(--muted);margin:6px 0 2px;line-height:1.5}
+.warn{color:var(--hot)}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="screen">
+    <canvas id="canvas" width="1920" height="1080"></canvas>
+    <div id="empty-hint">
+      <h2>Load your stop-motion photos</h2>
+      <p>Click <b>Load frames folder</b> and choose your <code>frames/</code> folder.
+         Characters and sequences are discovered automatically — nothing to configure first.</p>
+      <pre>frames/
+  base/          0  the wall, no mouse
+  loading/       5  startup sequence
+  easter/
+    dog_left/    4  easter eggs
+    dog_right/
+  &lt;character&gt;/
+    out/         1  |  or name them 1_out, 2_loop, 3_in —
+    loop/        2  |  a leading number is taken at its word
+    in/          3  |  (optional: omit it and 1 is rewound)</pre>
+      <p>Nothing is uploaded — the photos are read locally in this tab.</p>
+    </div>
+    <div id="hud">
+      <div class="badge">state <b id="b-state">—</b></div>
+      <div class="badge">character <b id="b-char">—</b></div>
+      <div class="badge">clip <b id="b-clip">—</b></div>
+      <div class="badge" id="b-timer-wrap">quiet <b id="b-timer">—</b></div>
+      <div id="meterwrap"><div class="badge" style="display:block">
+        sound <b id="b-vol">—</b>
+        <div id="meter"><div id="level"></div><div id="thr"></div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <div id="transport">
+    <button id="load" class="primary">Load frames folder</button>
+    <input type="file" id="picker" webkitdirectory directory multiple hidden>
+    <button id="run">▶ Run installation</button>
+    <button id="noise">Make a noise (space)</button>
+    <button id="mic">Use real mic</button>
+    <span style="flex:1"></span>
+    <button id="export">Export scenes.json</button>
+    <button id="import">Import scenes.json</button>
+    <input type="file" id="cfgpicker" accept=".json" hidden>
+  </div>
+  <div id="log"></div>
+</div>
+
+<div id="panel">
+  <h3>Preview</h3>
+  <label><span>Solo a character</span>
+    <select id="solo"><option value="">— run the full logic —</option></select></label>
+  <p class="hint" id="solo-hint">Solo plays one character's sequences end to end on
+     a loop, so you can judge its speed and framing without waiting out the quiet timer.</p>
+
+  <h3>Photos</h3>
+  <label style="display:block"><span style="display:block;margin-bottom:4px">frames_root</span>
+    <input type="text" id="d-root" placeholder="/Volumes/JuJu/_SVA/mouse-installation"
+      style="width:100%;background:#0e0e10;border:1px solid var(--line);color:var(--text);
+             border-radius:4px;padding:5px 7px;font:11px var(--mono)"></label>
+  <p class="hint">Where <code>build_scenes.py</code> looks for the full-resolution
+     photos. Load <code>frames_preview/</code> here in the browser, but this should
+     point at the drive holding <code>frames/</code>. Import your existing
+     scenes.json and it fills in by itself.</p>
+
+  <h3>Screen</h3>
+  <label><span>resolution</span><select id="d-screen">
+    <option value="1920x1080">1920 × 1080 (16:9)</option>
+    <option value="1280x720">1280 × 720 (16:9)</option>
+    <option value="3840x2160">3840 × 2160 (16:9)</option>
+    <option value="1920x1200">1920 × 1200 (16:10)</option>
+    <option value="3024x2016">3024 × 2016 (3:2 — matches the photos)</option>
+  </select></label>
+  <label><span>fit</span><select id="d-fit">
+    <option value="pad">pad — keep the whole frame</option>
+    <option value="crop">crop — fill the screen</option>
+  </select></label>
+  <p class="hint" id="fit-note"></p>
+  <p class="hint">Your photos are 3:2 and most screens are 16:9. Flip this while a
+     sequence plays to see exactly what each costs — then set the same value in
+     <code>scenes.json</code> and re-run <code>build_scenes.py</code>. Nothing is
+     baked in until you encode, so this can wait until the very end.</p>
+
+  <h3>Timing</h3>
+  <label><span>quiet_seconds</span><input type="range" id="t-quiet" min="1" max="90" step="1"><span class="val" id="v-quiet"></span></label>
+  <p class="hint">Unbroken quiet before a mouse comes out (0 → 1).</p>
+  <label><span>cooldown_seconds</span><input type="range" id="t-cool" min="0" max="60" step="1"><span class="val" id="v-cool"></span></label>
+  <p class="hint">Dead time on the base image after a retreat.</p>
+  <label><span>sound during 2</span>
+    <select id="t-loopexit">
+      <option value="finish_fast">finish loop fast, then 3</option>
+      <option value="cut">cut straight to 3</option>
+    </select></label>
+  <label><span>loop_exit_speed</span><input type="range" id="t-lspeed" min="1" max="8" step="0.5"><span class="val" id="v-lspeed"></span></label>
+  <p class="hint"><b>finish_fast</b> plays out the rest of the current loop cycle at this speed, so the hand-off to 3 lands on the pose the loop was shot to end on. <b>cut</b> is more startling but can jump the pose.</p>
+  <label><span>rewind_speed (1R)</span><input type="range" id="t-rspeed" min="0.5" max="4" step="0.1"><span class="val" id="v-rspeed"></span></label>
+  <p class="hint">Speed of the rewind when sound interrupts the out sequence.</p>
+
+  <h3>Easter eggs</h3>
+  <label><span>every (min)</span><input type="range" id="e-lo" min="1" max="20" step="1"><span class="val" id="v-elo"></span></label>
+  <label><span>every (max)</span><input type="range" id="e-hi" min="1" max="30" step="1"><span class="val" id="v-ehi"></span></label>
+  <p class="hint">A dog takes the slot a mouse would have used, this many emergences apart (random within the range).</p>
+  <label><span>order</span><select id="e-order">
+    <option value="alternate">alternate (dog 1, dog 2, dog 1…)</option>
+    <option value="random">random</option></select></label>
+  <div id="eggs"></div>
+  <label><span>quiet after a dog</span><input type="range" id="e-quiet" min="0" max="60" step="1"><span class="val" id="v-equiet"></span></label>
+  <p class="hint">A room reacting to the dog would otherwise have to fall silent for the full quiet_seconds all over again. This shortens the wait just after an easter egg.</p>
+
+  <h3>Sound</h3>
+  <label><span>auto threshold</span><input type="checkbox" id="a-auto"></label>
+  <p class="hint">Tracks the room's own noise floor so a hum doesn't keep the mouse hidden.</p>
+  <label><span>noise_margin</span><input type="range" id="a-margin" min="1.2" max="8" step="0.1"><span class="val" id="v-margin"></span></label>
+  <label><span>threshold (fixed)</span><input type="range" id="a-thr" min="0.002" max="0.2" step="0.002"><span class="val" id="v-thr"></span></label>
+  <label><span>flee_hits_needed</span><input type="range" id="a-hits" min="1" max="10" step="1"><span class="val" id="v-hits"></span></label>
+  <label><span>flee_hit_window</span><input type="range" id="a-win" min="0.05" max="1.5" step="0.05"><span class="val" id="v-win"></span></label>
+
+  <h3>Characters</h3>
+  <div id="chars"><p class="hint">Load a frames folder to see your cast here.</p></div>
+</div>
+
+<script>
+"use strict";
+/* ===========================================================================
+   Browser prototype for the mouse installation.
+
+   Runs the SAME state machine as mouse_video.py and reads/writes the SAME
+   scenes.json, so what you tune here is what the Pi will do. Sequences follow
+   the design doc's numbering:
+
+     0 base | 1 out | 2 loop | 3 in | 4 easter egg | 5 loading
+
+   Order:  0 - 1 - 2 (loops until sound) - 3 - 0
+   Sound:  during 0 nothing · during 1 rewind (1-1R-0) · during 2 go in (2-3-0)
+           during 3 nothing · during 4 nothing at all
+   =========================================================================== */
+
+const $ = id => document.getElementById(id);
+const IMG_RE = /\.(jpe?g|png|webp)$/i;
+const rand = (a,b) => a + Math.random()*(b-a);
+
+let cfg = {
+  frames_root:"",
+  display:{width:1920,height:1080,fit:"pad"},
+  audio:{device:0,samplerate:44100,block_seconds:0.05,auto_threshold:true,
+         noise_margin:3.0,threshold:0.04,min_threshold:0.015,
+         flee_hits_needed:3,flee_hit_window:0.35},
+  timing:{quiet_seconds:20,cooldown_seconds:6,
+          on_sound_during_loop:"finish_fast",loop_exit_speed:3.0,rewind_speed:1.5},
+  base:null, loading:null,
+  easter_eggs:{every:[4,8],order:"alternate",post_quiet_seconds:8.0,sequences:[]},
+  characters:[]
+};
+let library = {};
+
+/* --- discovery ------------------------------------------------------------ */
+// The design doc numbers the sequences, so a folder starting with that number
+// is taken at its word. Otherwise the name is matched.
+function roleOf(name){
+  const n = name.toLowerCase();
+  const m = n.match(/^([0-5])(?:[_\-. ]|$)/);
+  if(m) return ["base","out","loop","in","easter","loading"][+m[1]];
+  if(/(^|[_\-])(out|emerge|come|enter|appear|peek|arrive)/.test(n)) return "out";
+  if(/(^|[_\-])in([_\-]|$)|back|return|retreat|exit|leave|hide/.test(n)) return "in";
+  return "loop";
+}
+const naturalSort = (a,b) =>
+  a.replace(/\d+/g,d=>d.padStart(10,"0")).localeCompare(b.replace(/\d+/g,d=>d.padStart(10,"0")));
+
+async function loadFolder(files){
+  const dirs = {};
+  for(const f of files){
+    if(!IMG_RE.test(f.name) || f.name.startsWith(".")) continue;
+    const parts = f.webkitRelativePath.split("/");
+    parts.shift(); parts.pop();
+    if(!parts.length) continue;
+    const k = parts.join("/");
+    (dirs[k] = dirs[k] || []).push(f);
+  }
+  const keys = Object.keys(dirs);
+  if(!keys.length){ log("no image folders found — check the layout", true); return; }
+
+  library = {}; let total = 0;
+  for(const key of keys){
+    const entry = dirs[key].sort((a,b)=>naturalSort(a.name,b.name));
+    const images = (await Promise.all(entry.map(f => new Promise(res=>{
+      const img = new Image();
+      img.onload = ()=>res(img); img.onerror = ()=>res(null);
+      img.src = URL.createObjectURL(f);
+    })))).filter(Boolean);
+    library[key] = {images}; total += images.length;
+  }
+
+  const mkSeq = (key, fps, mode) =>
+    ({frames:"frames/"+key, fps, mode:mode||"loop", _key:key});
+
+  cfg.base = null; cfg.loading = null;
+  cfg.easter_eggs.sequences = [];
+  const chars = {};
+
+  for(const key of keys){
+    const parts = key.split("/");
+
+    if(parts.length === 1){
+      const r = roleOf(parts[0]);
+      if(r === "loading" || /load/i.test(parts[0])) cfg.loading = mkSeq(key,10,"once");
+      else if(r === "base" || /base|empty|wall|hole/i.test(parts[0])){
+        cfg.base = mkSeq(key,8,"loop"); cfg.base.min_seconds = 4.0;
+      }
+      continue;
+    }
+    // frames/easter/<name>/  -> the easter eggs (4)
+    if(parts.length === 2 && /^(easter|easter_eggs|eggs|4[_\-. ]?.*)$/i.test(parts[0])){
+      const sq = mkSeq(key,10,"once"); sq.name = parts[1]; sq.speed = 0.7;
+      cfg.easter_eggs.sequences.push(sq); continue;
+    }
+    const c = parts[0], sub = parts.slice(1).join("/");
+    chars[c] = chars[c] || {name:c, weight:1, quiet_seconds:null,
+                            out:null, loop:null, in:null, rewind_speed:null};
+    const role = roleOf(sub);
+    const sq = mkSeq(key, role==="loop"?8:10, role==="loop"?"loop":"once");
+    sq._role = role;
+    if(role==="out" && !chars[c].out) chars[c].out = sq;
+    else if(role==="in" && !chars[c].in) chars[c].in = sq;
+    else if(!chars[c].loop){ sq._role="loop"; sq.mode="loop"; chars[c].loop = sq; }
+  }
+  cfg.characters = Object.values(chars);
+
+  $("empty-hint").style.display = "none";
+  log(`loaded ${total} photos · ${cfg.characters.length} character(s) · ` +
+      `${cfg.easter_eggs.sequences.length} easter egg(s)`);
+  if(!cfg.base) log("no base image (0) — add frames/base/", true);
+  for(const c of cfg.characters){
+    if(!c.out)  log(`${c.name}: no out sequence (1)`, true);
+    if(!c.loop) log(`${c.name}: no loop sequence (2)`, true);
+    if(!c.in)   log(`${c.name}: no in sequence (3) — will rewind its out`);
+  }
+  renderChars(); renderEggs(); renderSolo(); resetMachine();
+}
+
+/* --- player --------------------------------------------------------------- */
+function orderOf(seq){
+  const n = seq._images.length, f=[...Array(n).keys()];
+  if(seq.mode==="reverse")  return f.reverse();
+  if(seq.mode==="pingpong") return n>2 ? f.concat(f.slice(1,-1).reverse()) : f;
+  return f;
+}
+function bind(seq){
+  if(!seq) return null;
+  const lib = library[seq._key];
+  if(!lib || !lib.images.length) return null;
+  seq._images = lib.images; return seq;
+}
+const canvas=$("canvas"), ctx=canvas.getContext("2d");
+const player = {
+  seq:null,order:[],i:0,acc:0,loop:true,speed:1,done:false,label:"—",
+  play(seq,{loop=true,speed=1,startFrame=0,reverse=false,label=""}={}){
+    if(!bind(seq)) return false;
+    const s = reverse ? Object.assign({},seq,{mode:"reverse",_images:seq._images}) : seq;
+    this.seq=s; this.order=orderOf(s);
+    this.i=Math.min(Math.max(0,startFrame),this.order.length-1);
+    this.acc=0; this.loop=loop; this.speed=speed; this.done=false;
+    this.label=(label||seq._key)+(reverse?" ⟲":"");
+    $("b-clip").textContent=this.label; this.draw(); return true;
+  },
+  step(dt){
+    if(!this.seq||this.done) return;
+    this.acc += dt*this.seq.fps*this.speed;
+    while(this.acc>=1){
+      this.acc-=1; this.i++;
+      if(this.i>=this.order.length){
+        if(this.loop) this.i=0;
+        else { this.i=this.order.length-1; this.done=true; break; }
+      }
+    }
+    this.draw();
+  },
+  progress(){ return this.order.length ? this.i/(this.order.length-1||1) : 0; },
+  nearEnd(m=0.12){ return this.order.length && (1-this.progress())<=m; },
+  draw(){
+    const img=this.seq && this.seq._images[this.order[this.i]];
+    ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    if(!img) return;
+    // pad = fit the whole frame in (bars); crop = fill the screen (lose top/bottom)
+    const fit=(cfg.display.fit==="crop")?Math.max:Math.min;
+    const s=fit(canvas.width/img.naturalWidth, canvas.height/img.naturalHeight);
+    const w=img.naturalWidth*s, h=img.naturalHeight*s;
+    ctx.drawImage(img,(canvas.width-w)/2,(canvas.height-h)/2,w,h);
+  }
+};
+
+/* --- sound ---------------------------------------------------------------- */
+const sound = {
+  level:0,recent:[],floor:[],micOn:false,manualUntil:0,analyser:null,buf:null,
+  async enableMic(){
+    try{
+      const st = await navigator.mediaDevices.getUserMedia({audio:{
+        echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+      const a=new AudioContext(), src=a.createMediaStreamSource(st);
+      this.analyser=a.createAnalyser(); this.analyser.fftSize=2048;
+      this.buf=new Float32Array(this.analyser.fftSize); src.connect(this.analyser);
+      this.micOn=true; $("mic").classList.add("on"); $("mic").textContent="Mic live";
+      log("mic on — the meter shows the real room");
+    }catch(e){ log("mic refused: "+e.message,true); }
+  },
+  sample(now){
+    let rms=0;
+    if(this.micOn&&this.analyser){
+      this.analyser.getFloatTimeDomainData(this.buf);
+      let s=0; for(let i=0;i<this.buf.length;i++) s+=this.buf[i]*this.buf[i];
+      rms=Math.sqrt(s/this.buf.length);
+    }
+    if(now<this.manualUntil) rms=Math.max(rms,0.5);
+    this.level=rms; this.recent.push([now,rms]);
+    while(this.recent.length && now-this.recent[0][0]>10) this.recent.shift();
+    this.floor.push(rms); if(this.floor.length>600) this.floor.shift();
+  },
+  threshold(){
+    const a=cfg.audio;
+    if(!a.auto_threshold||this.floor.length<40) return a.threshold;
+    const s=[...this.floor].sort((x,y)=>x-y);
+    return Math.max(a.min_threshold, s[Math.floor(s.length*0.2)]*a.noise_margin);
+  },
+  isLoud(thr,now){
+    const cut=now-cfg.audio.flee_hit_window; let h=0;
+    for(const [t,v] of this.recent) if(t>=cut&&v>thr) h++;
+    return h>=cfg.audio.flee_hits_needed;
+  },
+  bang(){ this.manualUntil=performance.now()/1000+0.4; }
+};
+
+/* --- easter egg scheduling ------------------------------------------------ */
+const eggs = {
+  countdown:0, index:0,
+  roll(){ const e=cfg.easter_eggs; return e.sequences.length
+    ? Math.floor(rand(e.every[0], e.every[1]+1)) : 1e9; },
+  reset(){ this.countdown=this.roll(); },
+  due(){ return cfg.easter_eggs.sequences.length && this.countdown<=0; },
+  tick(){ this.countdown--; },
+  take(){
+    const list=cfg.easter_eggs.sequences;
+    const sq = cfg.easter_eggs.order==="random"
+      ? list[Math.floor(Math.random()*list.length)]
+      : list[this.index++ % list.length];
+    this.countdown=this.roll(); return sq;
+  }
+};
+
+/* --- state machine: mirrors mouse_video.py -------------------------------- */
+let M = {state:"BASE",char:null,lastSound:0,entered:0,running:false,solo:null,nextQuiet:20};
+
+function pickCharacter(avoid){
+  const opts=cfg.characters.filter(c=>c!==avoid);
+  const pool=opts.length?opts:cfg.characters;
+  if(!pool.length) return null;
+  const tot=pool.reduce((s,c)=>s+(c.weight||1),0); let r=Math.random()*tot;
+  for(const c of pool){ r-=(c.weight||1); if(r<=0) return c; }
+  return pool[0];
+}
+const quietOf = c => (c&&c.quiet_seconds) || cfg.timing.quiet_seconds;
+const rewindOf = c => (c&&c.rewind_speed) || cfg.timing.rewind_speed;
+
+function enter(s,now){ M.state=s; M.entered=now; $("b-state").textContent=s;
+  log(`<b>${s}</b>${M.char?" · "+M.char.name:""}`,false,s==="IN"||s==="REWIND"); }
+
+function resetMachine(){
+  const now=performance.now()/1000;
+  M.char=pickCharacter(null); M.lastSound=now; M.entered=now;
+  M.nextQuiet=quietOf(M.char); eggs.reset();
+  if(cfg.loading && bind(cfg.loading)){
+    player.play(cfg.loading,{loop:false,label:"5 loading"}); M.state="LOADING";
+  }else if(cfg.base){ player.play(bind(cfg.base),{loop:true,label:"0 base"}); M.state="BASE"; }
+  $("b-state").textContent=M.state;
+}
+function goBase(now){
+  if(cfg.base) player.play(bind(cfg.base),{loop:true,label:"0 base"});
+  enter("COOLDOWN",now);
+}
+function startIn(now){
+  const c=M.char;
+  if(c.in) player.play(bind(c.in),{loop:false,label:"3 "+c.in._key});
+  else player.play(bind(c.out),{loop:false,reverse:true,speed:rewindOf(c),
+                                label:"3 (rewound out) "+c.out._key});
+  enter("IN",now);
+}
+
+function tick(now,dt){
+  sound.sample(now);
+  const thr=sound.threshold(), loud=sound.isLoud(thr,now);
+  // Sound during an easter egg is ignored outright, including for the timer.
+  if(loud && M.state!=="EASTER" && M.state!=="LOADING") M.lastSound=now;
+  const quiet=now-M.lastSound;
+
+  $("b-vol").textContent=sound.level.toFixed(3);
+  $("level").style.width=Math.min(100,sound.level/0.25*100)+"%";
+  $("level").style.background=loud?"var(--hot)":"var(--ok)";
+  $("thr").style.left=Math.min(100,thr/0.25*100)+"%";
+
+  if(M.solo || !M.running || !M.char){ player.step(dt); return; }
+  $("b-char").textContent=M.char.name;
+  const c=M.char, T=cfg.timing;
+
+  if(M.state==="LOADING"){
+    $("b-timer").textContent="loading";
+    if(player.done) goBase(now);
+  }
+  else if(M.state==="BASE"){
+    $("b-timer").textContent=`${quiet.toFixed(0)} / ${M.nextQuiet.toFixed(0)}s`;
+    if(quiet>=M.nextQuiet){
+      if(eggs.due()){
+        const sq=eggs.take();
+        player.play(bind(sq),{loop:false,speed:sq.speed||1,label:"4 "+sq.name});
+        enter("EASTER",now);
+      }else if(c.out && player.play(bind(c.out),{loop:false,label:"1 "+c.out._key})){
+        eggs.tick(); enter("OUT",now);
+      }
+    }
+  }
+  else if(M.state==="OUT"){
+    $("b-timer").textContent=(player.progress()*100).toFixed(0)+"%";
+    if(loud){
+      // 1 - 1R - 0 : mirror the frame so it turns around where it stands.
+      const n=player.order.length, start=Math.max(0,n-1-player.i);
+      player.play(bind(c.out),{loop:false,reverse:true,startFrame:start,
+                               speed:rewindOf(c),label:"1R "+c.out._key});
+      log(`rewind from frame ${n-start}/${n}`);
+      enter("REWIND",now);
+    } else if(player.done && c.loop){
+      player.play(bind(c.loop),{loop:true,label:"2 "+c.loop._key}); enter("LOOP",now);
+    }
+  }
+  else if(M.state==="REWIND"){
+    $("b-timer").textContent=(player.progress()*100).toFixed(0)+"%";
+    if(player.done) goBase(now);
+  }
+  else if(M.state==="LOOP"){
+    $("b-timer").textContent="looping";
+    if(loud){
+      if(T.on_sound_during_loop==="cut") startIn(now);
+      else { player.speed=T.loop_exit_speed; enter("LOOP_EXIT",now); }
+    }
+  }
+  else if(M.state==="LOOP_EXIT"){
+    $("b-timer").textContent="finishing loop ×"+T.loop_exit_speed;
+    if(player.nearEnd(0.15) || now-M.entered>5) startIn(now);
+  }
+  else if(M.state==="IN"){
+    $("b-timer").textContent=(player.progress()*100).toFixed(0)+"%";
+    if(player.done) goBase(now);
+  }
+  else if(M.state==="EASTER"){
+    $("b-timer").textContent="easter egg";
+    if(player.done){
+      if(cfg.base) player.play(bind(cfg.base),{loop:true,label:"0 base"});
+      M.lastSound=now; M.nextQuiet=cfg.easter_eggs.post_quiet_seconds;
+      enter("BASE",now);
+    }
+  }
+  else if(M.state==="COOLDOWN"){
+    $("b-timer").textContent=`${Math.max(0,T.cooldown_seconds-(now-M.entered)).toFixed(0)}s`;
+    if(now-M.entered>=T.cooldown_seconds){
+      M.char=pickCharacter(M.char); M.nextQuiet=quietOf(M.char); enter("BASE",now);
+    }
+  }
+  player.step(dt);
+}
+
+/* --- solo & egg preview ---------------------------------------------------- */
+let soloQ=[],soloI=0,soloHoldUntil=0;
+
+function previewEgg(sq){
+  if(!bind(sq)){ log("no frames loaded for "+sq.name,true); return; }
+  M.running=false; $("run").classList.remove("on");
+  $("run").textContent="▶ Run installation";
+  M.solo={name:sq.name}; $("solo").value="";
+  // 0 - 4 - 0, looping, so you judge the dog the way it actually appears.
+  soloQ=[[sq,{loop:false,speed:sq.speed||1,label:"4 "+sq.name}]];
+  if(cfg.base) soloQ.push([cfg.base,{loop:false,label:"0 base",hold:1.2}]);
+  soloI=0; soloHoldUntil=0;
+  $("b-state").textContent="PREVIEW"; $("b-char").textContent=sq.name;
+  log(`preview <b>${sq.name}</b> at ${Math.round((sq.speed||1)*100)}%`);
+  nextSolo();
+}
+function runSolo(name){
+  if(!name){ M.solo=null; resetMachine(); return; }
+  const c=cfg.characters.find(x=>x.name===name); if(!c) return;
+  M.running=false; M.solo=c; soloQ=[];
+  if(c.out)  soloQ.push([c.out ,{loop:false,label:"1 out"}]);
+  if(c.loop) soloQ.push([c.loop,{loop:false,label:"2 loop"}]);
+  if(c.in)   soloQ.push([c.in  ,{loop:false,label:"3 in"}]);
+  else if(c.out) soloQ.push([c.out,{loop:false,reverse:true,speed:rewindOf(c),
+                                    label:"3 (rewound out)"}]);
+  soloI=0; $("b-state").textContent="SOLO"; $("b-char").textContent=c.name; nextSolo();
+}
+function nextSolo(){
+  if(!soloQ.length) return;
+  const [sq,o]=soloQ[soloI++ % soloQ.length];
+  player.play(bind(sq),o);
+  soloHoldUntil = o.hold ? performance.now()/1000 + o.hold : 0;
+}
+
+/* --- loop ----------------------------------------------------------------- */
+let last=performance.now()/1000;
+function frame(){
+  const now=performance.now()/1000, dt=Math.min(0.1,now-last); last=now;
+  tick(now,dt);
+  if(M.solo && player.done && now >= soloHoldUntil) nextSolo();
+  if((frame.k=(frame.k||0)+1)%30===0) showFit();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function log(msg,warn,hot){
+  const el=document.createElement("div");
+  el.innerHTML=`<span style="color:#4a4a52">${new Date().toLocaleTimeString()}</span> ${msg}`;
+  if(warn||hot) el.className="flee";
+  $("log").appendChild(el); $("log").scrollTop=1e9;
+  while($("log").children.length>400) $("log").firstChild.remove();
+}
+
+/* --- panel ---------------------------------------------------------------- */
+function renderSolo(){
+  $("solo").innerHTML='<option value="">— run the full logic —</option>'+
+    cfg.characters.map(c=>`<option value="${c.name}">${c.name}</option>`).join("");
+}
+function seqRow(seq,num,label){
+  if(!seq) return `<p class="hint warn">${num} ${label}: not found</p>`;
+  const n=(library[seq._key]||{images:[]}).images.length;
+  const modes=["loop","pingpong","once","reverse"];
+  return `<div class="seq" data-key="${seq._key}">
+    <div class="seq-head"><b title="${seq._key}">${num} ${label}</b>
+      <span class="pill">${n}f · ${(n/(seq.fps||10)).toFixed(2)}s</span></div>
+    <label><span>fps</span><input type="range" data-act="fps" min="1" max="30" step="1" value="${seq.fps}"><span class="val">${seq.fps}</span></label>
+    ${num==="2"?`<label><span>mode</span><select data-act="mode">${modes.map(m=>
+      `<option ${m===seq.mode?"selected":""}>${m}</option>`).join("")}</select></label>`:""}
+  </div>`;
+}
+function renderEggs(){
+  const host=$("eggs");
+  if(!cfg.easter_eggs.sequences.length){ host.innerHTML=""; return; }
+  host.innerHTML = cfg.easter_eggs.sequences.map((sq,i)=>{
+    const n=(library[sq._key]||{images:[]}).images.length;
+    const secs=(n/(sq.fps||10))/(sq.speed||1);
+    return `<div class="seq" data-ei="${i}">
+      <div class="seq-head"><b>${sq.name}</b>
+        <span class="pill">${n}f · ${secs.toFixed(2)}s</span>
+        <button data-act="eplay" style="padding:3px 9px;font-size:11px">▶ preview</button></div>
+      <label><span>speed</span><input type="range" data-act="espeed" min="0.2" max="2" step="0.05" value="${sq.speed||1}"><span class="val">${((sq.speed||1)*100).toFixed(0)}%</span></label>
+      <label><span>fps</span><input type="range" data-act="efps" min="1" max="30" step="1" value="${sq.fps}"><span class="val">${sq.fps}</span></label>
+    </div>`;}).join("");
+  host.querySelectorAll(".seq").forEach(el=>{
+    const sq=cfg.easter_eggs.sequences[+el.dataset.ei];
+    el.addEventListener("click",e=>{
+      if(e.target.dataset.act==="eplay") previewEgg(sq);
+    });
+    el.addEventListener("input",e=>{
+      const act=e.target.dataset.act, v=+e.target.value; if(!act) return;
+      if(act==="espeed"){ sq.speed=v; e.target.nextElementSibling.textContent=(v*100).toFixed(0)+"%";
+        // If this dog is on screen right now, apply it live.
+        if(player.seq && player.seq._key===sq._key) player.speed=v; }
+      if(act==="efps"){ sq.fps=v; e.target.nextElementSibling.textContent=v; }
+      const n=library[sq._key].images.length;
+      el.querySelector(".pill").textContent=`${n}f · ${((n/sq.fps)/(sq.speed||1)).toFixed(2)}s`;
+    });
+  });
+}
+function renderChars(){
+  const host=$("chars");
+  if(!cfg.characters.length){ host.innerHTML='<p class="hint">Load a frames folder to see your cast here.</p>'; return; }
+  host.innerHTML = cfg.characters.map((c,ci)=>`
+    <details class="char" data-ci="${ci}"><summary>${c.name}</summary><div>
+      <label><span>weight</span><input type="range" data-act="weight" min="0.5" max="6" step="0.5" value="${c.weight}"><span class="val">${c.weight}</span></label>
+      <label><span>quiet_seconds</span><input type="number" data-act="quiet" placeholder="global" value="${c.quiet_seconds??""}"></label>
+      <label><span>rewind speed (1R)</span><input type="number" step="0.1" data-act="rspeed" placeholder="global" value="${c.rewind_speed??""}"></label>
+      ${c.in?'<p class="hint">Has its own in sequence (3).</p>'
+            :'<p class="hint"><b>No in sequence (3)</b> — goes back by rewinding its out.</p>'}
+      ${seqRow(c.out,"1","out")}
+      ${seqRow(c.loop,"2","loop")}
+      ${c.in?seqRow(c.in,"3","in"):""}
+    </div></details>`).join("");
+
+  host.querySelectorAll(".char").forEach(el=>{
+    const c=cfg.characters[+el.dataset.ci];
+    el.addEventListener("input",e=>{
+      const act=e.target.dataset.act; if(!act) return;
+      const v=e.target.value, sEl=e.target.closest(".seq");
+      if(sEl){
+        const seq=[c.out,c.loop,c.in].find(s=>s&&s._key===sEl.dataset.key); if(!seq) return;
+        if(act==="fps"){ seq.fps=+v; sEl.querySelector(".val").textContent=v;
+          const n=library[seq._key].images.length;
+          sEl.querySelector(".pill").textContent=`${n}f · ${(n/+v).toFixed(2)}s`; }
+        if(act==="mode") seq.mode=v;
+        return;
+      }
+      if(act==="weight"){ c.weight=+v; e.target.nextElementSibling.textContent=v; }
+      if(act==="quiet")  c.quiet_seconds = v===""?null:+v;
+      if(act==="rspeed") c.rewind_speed  = v===""?null:+v;
+    });
+  });
+}
+
+const SYNCS=[];
+function slider(id,vid,get,set,fmt=v=>v){
+  const el=$(id),out=$(vid);
+  const sync=()=>{ el.value=get(); out.textContent=fmt(get()); };
+  sync(); SYNCS.push(sync);
+  el.addEventListener("input",()=>{ set(+el.value); out.textContent=fmt(+el.value); });
+}
+slider("t-quiet","v-quiet",()=>cfg.timing.quiet_seconds,v=>cfg.timing.quiet_seconds=v,v=>v+"s");
+slider("t-cool","v-cool",()=>cfg.timing.cooldown_seconds,v=>cfg.timing.cooldown_seconds=v,v=>v+"s");
+slider("t-lspeed","v-lspeed",()=>cfg.timing.loop_exit_speed,v=>cfg.timing.loop_exit_speed=v,v=>"×"+(+v).toFixed(1));
+slider("t-rspeed","v-rspeed",()=>cfg.timing.rewind_speed,v=>cfg.timing.rewind_speed=v,v=>"×"+(+v).toFixed(1));
+slider("e-lo","v-elo",()=>cfg.easter_eggs.every[0],v=>cfg.easter_eggs.every[0]=v);
+slider("e-hi","v-ehi",()=>cfg.easter_eggs.every[1],v=>cfg.easter_eggs.every[1]=v);
+slider("e-quiet","v-equiet",()=>cfg.easter_eggs.post_quiet_seconds,v=>cfg.easter_eggs.post_quiet_seconds=v,v=>v+"s");
+slider("a-margin","v-margin",()=>cfg.audio.noise_margin,v=>cfg.audio.noise_margin=v,v=>"×"+(+v).toFixed(1));
+slider("a-thr","v-thr",()=>cfg.audio.threshold,v=>cfg.audio.threshold=v,v=>(+v).toFixed(3));
+slider("a-hits","v-hits",()=>cfg.audio.flee_hits_needed,v=>cfg.audio.flee_hits_needed=v);
+slider("a-win","v-win",()=>cfg.audio.flee_hit_window,v=>cfg.audio.flee_hit_window=v,v=>(+v).toFixed(2)+"s");
+$("a-auto").checked=cfg.audio.auto_threshold;
+$("a-auto").onchange=e=>cfg.audio.auto_threshold=e.target.checked;
+$("t-loopexit").value=cfg.timing.on_sound_during_loop;
+$("t-loopexit").onchange=e=>cfg.timing.on_sound_during_loop=e.target.value;
+$("e-order").value=cfg.easter_eggs.order;
+$("e-order").onchange=e=>cfg.easter_eggs.order=e.target.value;
+$("d-root").value=cfg.frames_root||"";
+$("d-root").oninput=e=>cfg.frames_root=e.target.value.trim();
+$("d-screen").value=cfg.display.width+"x"+cfg.display.height;
+$("d-fit").value=cfg.display.fit;
+$("d-fit").onchange=e=>{ cfg.display.fit=e.target.value; player.draw(); showFit(); };
+function showFit(){
+  const img=player.seq && player.seq._images[player.order[player.i]];
+  if(!img){ $("fit-note").textContent=""; return; }
+  const r=img.naturalWidth/img.naturalHeight;          // photo aspect
+  const sr=canvas.width/canvas.height;                 // screen aspect
+  if(Math.abs(r-sr)<0.01){
+    $("fit-note").textContent="Photos match the screen exactly — nothing lost either way.";
+    return;
+  }
+  // Same figure both ways: the mismatch is either given up as bars or cropped off.
+  const pct=Math.round((1-Math.min(r,sr)/Math.max(r,sr))*100);
+  const narrow = r < sr;   // photo narrower than the screen
+  $("fit-note").textContent = cfg.display.fit==="crop"
+    ? `Filling the screen — losing about ${pct}% off the ${narrow?"top and bottom":"left and right"}.`
+    : `Whole frame kept — black bars ${narrow?"down the sides":"top and bottom"}, about ${pct}% of the screen.`;
+}
+function setScreen(w,h){ canvas.width=w; canvas.height=h; player.draw(); showFit(); }
+$("d-screen").onchange=e=>{
+  const [w,h]=e.target.value.split("x").map(Number);
+  cfg.display.width=w; cfg.display.height=h; setScreen(w,h);
+};
+
+$("load").onclick=()=>$("picker").click();
+$("picker").onchange=e=>loadFolder([...e.target.files]);
+$("run").onclick=()=>{
+  if(!cfg.characters.length){ log("load a frames folder first",true); return; }
+  M.running=!M.running; M.solo=null; $("solo").value="";
+  $("run").classList.toggle("on",M.running);
+  $("run").textContent=M.running?"■ Stop":"▶ Run installation";
+  if(M.running){ resetMachine(); log("running — the room decides from here"); }
+};
+$("noise").onclick=()=>{ sound.bang(); log("noise"); };
+$("mic").onclick=()=>sound.enableMic();
+$("solo").onchange=e=>runSolo(e.target.value);
+document.addEventListener("keydown",e=>{
+  if(e.code==="Space"){ e.preventDefault(); sound.bang(); log("noise"); }});
+
+/* --- import / export ------------------------------------------------------ */
+$("export").onclick=()=>{
+  const out=JSON.parse(JSON.stringify(cfg,(k,v)=>k.startsWith("_")?undefined:v));
+  if(!out.frames_root) delete out.frames_root;
+  out._comment=["Exported from prototype.html.",
+    "0 base | 1 out | 2 loop | 3 in | 4 easter egg | 5 loading",
+    "Then: python3 build_scenes.py && python3 mouse_video.py"];
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)],{type:"application/json"}));
+  a.download="scenes.json"; a.click();
+  log("exported scenes.json");
+  if(!out.frames_root)
+    log("no frames_root set — build_scenes.py will look for the photos next to "+
+        "itself. Fill it in above, or keep the line from your existing file.", true);
+};
+$("import").onclick=()=>$("cfgpicker").click();
+$("cfgpicker").onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const inc=JSON.parse(await f.text());
+    const byPath={};
+    const reg=s=>{ if(s) byPath[s.frames]=s; };
+    reg(cfg.base); reg(cfg.loading); cfg.easter_eggs.sequences.forEach(reg);
+    for(const c of cfg.characters){ reg(c.out); reg(c.loop); reg(c.in); }
+    const adopt=s=>{ const d=s&&byPath[s.frames]; if(d){
+      d.fps=s.fps??d.fps; d.mode=s.mode??d.mode;
+      if(s.speed!=null) d.speed=s.speed; } };
+    adopt(inc.base); adopt(inc.loading);
+    ((inc.easter_eggs||{}).sequences||[]).forEach(adopt);
+    for(const ic of inc.characters||[]){
+      const c=cfg.characters.find(x=>x.name===ic.name); if(!c) continue;
+      c.weight=ic.weight??c.weight; c.quiet_seconds=ic.quiet_seconds??null;
+      c.rewind_speed=ic.rewind_speed??null;
+      adopt(ic.out); adopt(ic.loop); adopt(ic.in);
+    }
+    if(inc.frames_root) cfg.frames_root=inc.frames_root;
+    if(inc.timing) Object.assign(cfg.timing,inc.timing);
+    if(inc.audio)  Object.assign(cfg.audio,inc.audio);
+    if(inc.easter_eggs){
+      const E=inc.easter_eggs;
+      if(E.every) cfg.easter_eggs.every=E.every;
+      if(E.order) cfg.easter_eggs.order=E.order;
+      if(E.post_quiet_seconds!=null) cfg.easter_eggs.post_quiet_seconds=E.post_quiet_seconds;
+    }
+    renderChars(); renderEggs(); SYNCS.forEach(f=>f());
+    $("d-root").value=cfg.frames_root||"";
+    $("a-auto").checked=cfg.audio.auto_threshold;
+    $("t-loopexit").value=cfg.timing.on_sound_during_loop;
+    $("e-order").value=cfg.easter_eggs.order;
+    log("imported scenes.json");
+  }catch(err){ log("bad scenes.json: "+err.message,true); }
+};
+
+log("ready — load your frames folder to begin");
+
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Python packages (install with: pip install -r requirements.txt --break-system-packages)
+numpy
+sounddevice
+
+# Also required, installed as system packages (not pip):
+#   mpv           (sudo apt install mpv)         plays the clips
+#   ffmpeg        (sudo apt install ffmpeg)      build_scenes.py: photos -> clips
+#   libportaudio2 (sudo apt install libportaudio2)  needed by sounddevice
