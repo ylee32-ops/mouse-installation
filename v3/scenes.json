@@ -1,0 +1,218 @@
+{
+  "display": {
+    "width": 1920,
+    "height": 1080,
+    "fit": "pad"
+  },
+  "audio": {
+    "device": 0,
+    "samplerate": 44100,
+    "block_seconds": 0.05,
+    "auto_threshold": true,
+    "noise_margin": 3.0,
+    "threshold": 0.04,
+    "min_threshold": 0.015,
+    "flee_hits_needed": 1,
+    "flee_hit_window": 0.35,
+    "band_hz": [
+      300,
+      3000
+    ]
+  },
+  "timing": {
+    "quiet_seconds": 4,
+    "cooldown_seconds": 2,
+    "on_sound_during_loop": "finish_fast",
+    "loop_exit_speed": 2,
+    "rewind_speed": 1.5
+  },
+  "base": {
+    "frames": "frames/base",
+    "fps": 8,
+    "mode": "loop",
+    "min_seconds": 4
+  },
+  "loading": {
+    "frames": "frames/loading",
+    "fps": 10,
+    "mode": "once"
+  },
+  "easter_eggs": {
+    "every": [
+      4,
+      8
+    ],
+    "order": "alternate",
+    "post_quiet_seconds": 2,
+    "sequences": [
+      {
+        "frames": "frames/easter/dog2",
+        "fps": 10,
+        "mode": "once",
+        "name": "dog2",
+        "speed": 0.5
+      },
+      {
+        "frames": "frames/easter/dog1",
+        "fps": 10,
+        "mode": "once",
+        "name": "dog1",
+        "speed": 0.5
+      }
+    ]
+  },
+  "characters": [
+    {
+      "name": "tequila",
+      "weight": 1,
+      "quiet_seconds": null,
+      "out": {
+        "frames": "frames/tequila/1_out",
+        "fps": 10,
+        "mode": "once"
+      },
+      "loop": {
+        "frames": "frames/tequila/2_loop",
+        "fps": 8,
+        "mode": "loop"
+      },
+      "in": {
+        "frames": "frames/tequila/3_in",
+        "fps": 10,
+        "mode": "once"
+      },
+      "rewind_speed": null
+    },
+    {
+      "name": "marshmallow",
+      "weight": 1,
+      "quiet_seconds": null,
+      "out": {
+        "frames": "frames/marshmallow/1_out",
+        "fps": 10,
+        "mode": "once"
+      },
+      "loop": {
+        "frames": "frames/marshmallow/2_loop",
+        "fps": 8,
+        "mode": "loop"
+      },
+      "in": {
+        "frames": "frames/marshmallow/3_in",
+        "fps": 10,
+        "mode": "once"
+      },
+      "rewind_speed": null
+    },
+    {
+      "name": "gusgus",
+      "weight": 1,
+      "quiet_seconds": null,
+      "out": {
+        "frames": "frames/gusgus/1_out",
+        "fps": 10,
+        "mode": "once"
+      },
+      "loop": {
+        "frames": "frames/gusgus/2_loop",
+        "fps": 8,
+        "mode": "loop"
+      },
+      "in": {
+        "frames": "frames/gusgus/3_in",
+        "fps": 10,
+        "mode": "once"
+      },
+      "rewind_speed": null
+    },
+    {
+      "name": "shrek",
+      "weight": 1,
+      "quiet_seconds": null,
+      "out": {
+        "frames": "frames/shrek/1_out",
+        "fps": 10,
+        "mode": "once"
+      },
+      "loop": {
+        "frames": "frames/shrek/2_loop",
+        "fps": 8,
+        "mode": "loop"
+      },
+      "in": {
+        "frames": "frames/shrek/3_in",
+        "fps": 10,
+        "mode": "once"
+      },
+      "rewind_speed": null
+    },
+    {
+      "name": "sam_and_ham",
+      "weight": 1,
+      "quiet_seconds": null,
+      "out": {
+        "frames": "frames/sam_and_ham/1_out",
+        "fps": 10,
+        "mode": "once"
+      },
+      "loop": {
+        "frames": "frames/sam_and_ham/2_loop",
+        "fps": 8,
+        "mode": "loop"
+      },
+      "in": {
+        "frames": "frames/sam_and_ham/3_in",
+        "fps": 10,
+        "mode": "once"
+      },
+      "rewind_speed": null
+    },
+    {
+      "name": "jerry",
+      "weight": 1,
+      "quiet_seconds": null,
+      "out": {
+        "frames": "frames/jerry/1_out",
+        "fps": 10,
+        "mode": "once"
+      },
+      "loop": {
+        "frames": "frames/jerry/2_loop",
+        "fps": 8,
+        "mode": "loop"
+      },
+      "in": {
+        "frames": "frames/jerry/3_in",
+        "fps": 10,
+        "mode": "once"
+      },
+      "rewind_speed": null
+    },
+    {
+      "name": "taro",
+      "weight": 1,
+      "quiet_seconds": null,
+      "out": {
+        "frames": "frames/taro/1_out",
+        "fps": 10,
+        "mode": "once"
+      },
+      "loop": {
+        "frames": "frames/taro/2_loop",
+        "fps": 8,
+        "mode": "loop"
+      },
+      "in": {
+        "frames": "frames/taro/3_in",
+        "fps": 10,
+        "mode": "once"
+      },
+      "rewind_speed": null
+    }
+  ],
+  "_comment": [
+    "Exported from prototype.html.",
+    "0 base | 1 out | 2 loop | 3 in | 4 easter egg | 5 loading",
+    "Then: python3 build_scenes.py && python3 mouse_video.py"
+  ]
+}
